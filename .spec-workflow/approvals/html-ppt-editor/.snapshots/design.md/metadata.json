@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/html-ppt-editor/design.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-20T03:11:49.819Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760929909816_p3ytnpp5l",
+      "approvalTitle": "HTML PPT编辑器设计文档审批"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__spec-workflow__spec-workflow-guide",
+      "mcp__spec-workflow__approvals",
+      "Bash(npm install)",
+      "Bash(npm run build)",
+      "Bash(npm run lint)",
+      "Bash(npm install:*)",
+      "Bash(npm run format:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run dev)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,26 @@
+# Dependencies
+node_modules
+dist
+
+# Public files
+public
+
+# Config files
+*.config.js
+*.config.ts
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
