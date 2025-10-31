@@ -71,7 +71,7 @@
           >
             <div class="thumbnail-preview">
               <div class="page-number">{{ index + 1 }}</div>
-              <div class="preview-content" v-html="page.html"></div>
+              <div class="preview-content" v-html="generateThumbnailContent(page)"></div>
             </div>
             <div class="thumbnail-title">{{ page.name || `页面 ${index + 1}` }}</div>
             <div class="drag-handle" title="拖拽调整顺序">
@@ -231,6 +231,20 @@ const generatePreviewHTML = (title: string, css: string, html: string, js: strin
     bodyClose,
     htmlClose
   ].join('\n')
+}
+
+const generateThumbnailContent = (page: any) => {
+  // 为缩略图生成包含样式的HTML内容
+  const baseStyle = `
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f5f7fa;
+      font-family: 'Microsoft YaHei', Arial, sans-serif;
+    }
+  `
+  const styleTag = '<style>' + baseStyle + (page.css || '') + '</style>'
+  return styleTag + (page.html || '')
 }
 
 // 方法
@@ -718,11 +732,12 @@ onBeforeUnmount(() => {
 }
 
 .preview-content {
-  width: 100%;
-  height: 100%;
+  width: 500%;
+  height: 500%;
   transform: scale(0.2);
   transform-origin: top left;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .thumbnail-title {
@@ -771,7 +786,7 @@ onBeforeUnmount(() => {
 .page-preview {
   width: 100%;
   min-height: 500px;
-  padding: 20px;
+  padding: 0;
 }
 
 .code-editor-area {

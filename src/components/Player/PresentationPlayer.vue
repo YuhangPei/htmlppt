@@ -72,8 +72,10 @@
 
     <!-- 浮动工具箱 -->
     <div
-      class="floating-toolbar"
+      :class="['floating-toolbar', { transparent: isToolbarTransparent }]"
       :style="{ left: toolbarX + 'px', top: toolbarY + 'px' }"
+      @mouseenter="handleToolbarMouseEnter"
+      @mouseleave="handleToolbarMouseLeave"
     >
       <div class="toolbar-handle" @mousedown="startDragToolbar">
         <el-icon><Rank /></el-icon>
@@ -230,12 +232,17 @@ const toolbarY = ref(20)
 const isDraggingToolbar = ref(false)
 const dragStartX = ref(0)
 const dragStartY = ref(0)
+const isToolbarTransparent = ref(false)
+let toolbarTimer: NodeJS.Timeout | null = null
 
 // 绘画状态
 const isDrawing = ref(false)
 const drawingContext = ref<CanvasRenderingContext2D | null>(null)
 const lastX = ref(0)
 const lastY = ref(0)
+
+// 画布数据存储 - 为每个页面保存绘制内容
+const canvasDataMap = ref<Map<number, ImageData>>(new Map())
 
 // 计算属性
 const currentSlide = computed(() => {
@@ -268,15 +275,25 @@ const currentSlideStyle = computed(() => {
 // 方法
 const previousPage = () => {
   if (currentPageIndex.value > 0) {
+    // 保存当前页面的绘制内容
+    saveCanvasData()
     currentPageIndex.value--
-    clearAllDrawings()
+    // 恢复上一页的绘制内容
+    nextTick(() => {
+      restoreCanvasData()
+    })
   }
 }
 
 const nextPage = () => {
   if (currentPageIndex.value < props.pages.length - 1) {
+    // 保存当前页面的绘制内容
+    saveCanvasData()
     currentPageIndex.value++
-    clearAllDrawings()
+    // 恢复下一页的绘制内容
+    nextTick(() => {
+      restoreCanvasData()
+    })
   }
 }
 
@@ -397,6 +414,9 @@ const draw = (event: MouseEvent) => {
 
   lastX.value = currentX
   lastY.value = currentY
+
+  // 绘制后自动保存当前页面的画布状态
+  saveCanvasData()
 }
 
 const stopDrawing = () => {
@@ -409,6 +429,25 @@ const stopDrawing = () => {
 const clearAllDrawings = () => {
   if (drawingContext.value && drawingCanvas.value) {
     drawingContext.value.clearRect(0, 0, drawingCanvas.value.width, drawingCanvas.value.height)
+    // 从存储中删除当前页面的绘制数据
+    canvasDataMap.value.delete(currentPageIndex.value)
+  }
+}
+
+const saveCanvasData = () => {
+  if (drawingContext.value && drawingCanvas.value) {
+    const imageData = drawingContext.value.getImageData(0, 0, drawingCanvas.value.width, drawingCanvas.value.height)
+    canvasDataMap.value.set(currentPageIndex.value, imageData)
+  }
+}
+
+const restoreCanvasData = () => {
+  if (drawingContext.value && drawingCanvas.value) {
+    drawingContext.value.clearRect(0, 0, drawingCanvas.value.width, drawingCanvas.value.height)
+    const savedData = canvasDataMap.value.get(currentPageIndex.value)
+    if (savedData) {
+      drawingContext.value.putImageData(savedData, 0, 0)
+    }
   }
 }
 
@@ -416,6 +455,7 @@ const startDragToolbar = (event: MouseEvent) => {
   isDraggingToolbar.value = true
   dragStartX.value = event.clientX - toolbarX.value
   dragStartY.value = event.clientY - toolbarY.value
+  resetToolbarTimer()
 
   const handleMouseMove = (e: MouseEvent) => {
     if (isDraggingToolbar.value) {
@@ -426,12 +466,36 @@ const startDragToolbar = (event: MouseEvent) => {
 
   const handleMouseUp = () => {
     isDraggingToolbar.value = false
+    startToolbarTimer()
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
   }
 
   document.addEventListener('mousemove', handleMouseMove)
   document.addEventListener('mouseup', handleMouseUp)
+}
+
+const handleToolbarMouseEnter = () => {
+  resetToolbarTimer()
+}
+
+const handleToolbarMouseLeave = () => {
+  startToolbarTimer()
+}
+
+const startToolbarTimer = () => {
+  resetToolbarTimer()
+  toolbarTimer = setTimeout(() => {
+    isToolbarTransparent.value = true
+  }, 3000) // 3秒后变透明
+}
+
+const resetToolbarTimer = () => {
+  if (toolbarTimer) {
+    clearTimeout(toolbarTimer)
+    toolbarTimer = null
+  }
+  isToolbarTransparent.value = false
 }
 
 const exitPresentation = () => {
@@ -457,14 +521,22 @@ const initCanvas = () => {
 }
 
 const handleResize = () => {
+  // 保存当前画布内容
+  saveCanvasData()
+
   if (drawingCanvas.value) {
     drawingCanvas.value.width = window.innerWidth
     drawingCanvas.value.height = window.innerHeight
+
+    // 恢复当前页面的画布内容
+    nextTick(() => {
+      restoreCanvasData()
+    })
   }
 }
 
-// 监听页面变化，执行JS代码
-watch(currentSlide, (newSlide) => {
+// 监听页面变化，执行JS代码并恢复画布
+watch(currentSlide, (newSlide, oldSlide) => {
   if (newSlide && newSlide.js) {
     try {
       // 在安全的环境中执行JS代码
@@ -472,6 +544,13 @@ watch(currentSlide, (newSlide) => {
     } catch (error) {
       console.warn('Failed to execute page script:', error)
     }
+  }
+
+  // 如果页面发生了变化（不是初始化），恢复画布内容
+  if (oldSlide !== undefined && newSlide !== oldSlide) {
+    nextTick(() => {
+      restoreCanvasData()
+    })
   }
 }, { immediate: true })
 
@@ -488,6 +567,9 @@ onMounted(() => {
   // 监听窗口大小变化
   window.addEventListener('resize', handleResize)
 
+  // 启动工具栏定时器
+  startToolbarTimer()
+
   // 聚焦以接收键盘事件
   nextTick(() => {
     const player = document.querySelector('.presentation-player') as HTMLElement
@@ -502,6 +584,9 @@ onUnmounted(() => {
   if (document.fullscreenElement) {
     document.exitFullscreen()
   }
+
+  // 清理定时器
+  resetToolbarTimer()
 
   // 移除事件监听
   window.removeEventListener('resize', handleResize)
@@ -647,8 +732,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 4px;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+
+.floating-toolbar.transparent {
   opacity: 0.3;
-  transition: opacity 0.3s ease;
 }
 
 .floating-toolbar:hover {
